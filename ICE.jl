@@ -164,7 +164,7 @@ addprocs(nprocsadded, exeflags="--project")
     nw = 64 * 2
     θ = 89.5 * π / 180
     ωrs = range(0.0, stop=50, length=nw) * w0
-    ks = collect((1/2nk:1/nk:1-1/2nk) .* 1150 .+ 100) .* k0
+    ks = collect((1/2nk:1/nk:1-1/2nk) .* 2000 .+ 100) .* k0
     ks = vcat(collect(1/2nk:1/nk:1-1/2nk) .* 100 * k0, ks)
     ks = vcat(-ks, ks)
     kz⊥s = [abs(k) .* (sign(k) * cospi(θ / π), sinpi(θ / π)) for k in ks]
@@ -295,7 +295,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
   Plots.savefig("ICE2D_Combo_$file_extension.pdf")
 end
 
-if false
+if true
   @time plasmasols = findsolutions(Smmh)
   @show length(plasmasols)
   @time plotit(plasmasols)
