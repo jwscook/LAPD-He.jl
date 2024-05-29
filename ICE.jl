@@ -85,15 +85,16 @@ addprocs(nprocsadded, exeflags="--project")
   w0 = abs(Ωi)
   k0 = w0 / abs(Va)
 
-  gammamax = abs(Ωi) * 0.005
-  gammamin = -gammamax / 4
+  gammamax = abs(Ωi) * 0.001
+  gammamin = -gammamax / 1.5
   function bounds(ω0)
     lb = @SArray [ω0 - w0 / 2, gammamin]
     ub = @SArray [ω0 + w0 / 2, gammamax]
     return (lb, ub)
   end
 
-  options = Options(memoiseparallel=false, memoiseperpendicular=true)
+  options = Options(memoiseparallel=false, memoiseperpendicular=true,
+   rtols=1e-14)
 
   function solve_given_kω(K, ωr, objective!)
     lb, ub = bounds(ωr)
@@ -163,7 +164,7 @@ addprocs(nprocsadded, exeflags="--project")
     nk = 128 * 4
     nw = 64 * 2
     θ = 89.5 * π / 180
-    ωrs = range(0.0, stop=50, length=nw) * w0
+    ωrs = range(0.0, stop=60, length=nw) * w0
     ks = collect((1/2nk:1/nk:1-1/2nk) .* 2000 .+ 100) .* k0
     ks = vcat(collect(1/2nk:1/nk:1-1/2nk) .* 100 * k0, ks)
     ks = vcat(-ks, ks)
@@ -212,7 +213,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
 
   imaglolim = -1e-4
   wplotmax = ceil(Int, maximum(real, ωs) / 10) * 10
-  kplotmax = ceil(Int, maximum(real, ks) / 50) * 50
+  kplotmax = ceil(Int, maximum(real, ks) / 500) * 500
 
   mask = shuffle(findall(@. (imag(ωs) > imaglolim) & (real(ωs) <= wplotmax)))
   @warn "Scatter plots rendering with $(length(mask)) points."
@@ -228,9 +229,9 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
   xlabel = "\$\\mathrm{Wavenumber} \\ [\\Omega_{i}/V_A]\$"
   ylabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
   h0 = Plots.scatter(ks[mask][perm], real.(ωs[mask][perm]),
-    zcolor=(imag.(ωs[mask][perm])), framestyle=:box, lims=:round,
+    zcolor=imag.(ωs[mask][perm]) .* 1e3, framestyle=:box, lims=:round,
     markersize=msize+1, markerstrokewidth=0, markershape=:circle,
-    c=colorgrad, xticks=-kplotmax:200:kplotmax, yticks=0:5:wplotmax,
+    c=colorgrad, xticks=-kplotmax:500:kplotmax, yticks=0:5:wplotmax,
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
   Plots.plot!(legend=false)
   Plots.savefig("ICE2D_FKwplotmax_$file_extension.pdf")
