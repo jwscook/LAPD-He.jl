@@ -32,7 +32,7 @@ addprocs(nprocsadded, exeflags="--project")
   n0 = 3e16
   B0 = 0.15
   ξ = 0.0233
-  Z = 1
+  Z = 1 # singly charged Helium
 
   ni = n0 / (1.0 + Z * ξ)
   nf = ξ*ni
@@ -86,7 +86,7 @@ addprocs(nprocsadded, exeflags="--project")
   k0 = w0 / abs(Va)
 
   gammamax = abs(Ωi) * 0.005
-  gammamin = -gammamax / 2
+  gammamin = -gammamax / 4
   function bounds(ω0)
     lb = @SArray [ω0 - w0 / 2, gammamin]
     ub = @SArray [ω0 + w0 / 2, gammamax]
@@ -109,7 +109,7 @@ addprocs(nprocsadded, exeflags="--project")
 
     ics = ((@SArray [ωr, gammamax*0.9]),
            (@SArray [ωr, gammamax*0.25]),
-#           (@SArray [ωr, gammamax*0.1]),
+           (@SArray [ωr, gammamax*0.1]),
            (@SArray [ωr, -gammamax*0.1]))
 
     function unitobjective!(c, x::T) where {T}
@@ -118,7 +118,7 @@ addprocs(nprocsadded, exeflags="--project")
     end
     unitobjectivex! = x -> unitobjective!(config, x)
     boundedunitobjective! = boundify(unitobjectivex!)
-    xtol_abs = (@SArray [1e-3, 1e-3])
+    xtol_abs = (@SArray [1e-4, 1e-6])
     solutions = []
 
     @elapsed for ic ∈ ics
@@ -160,21 +160,26 @@ addprocs(nprocsadded, exeflags="--project")
   end
 
   function findsolutions(plasma)
-#    ngridpoints = 2^9
-    nk = 256 ÷ 2
-    nw = 64 ÷ 2#ngridpoints ÷ 2
+    nk = 128 * 4
+    nw = 64 * 2
+    θ = 89.5 * π / 180
     ωrs = range(0.0, stop=50, length=nw) * w0
-    ks = (1/2nk:1/nk:1-1/2nk) .* 1250 * k0
+    ks = collect((1/2nk:1/nk:1-1/2nk) .* 1150 .+ 100) .* k0
+    ks = vcat(collect(1/2nk:1/nk:1-1/2nk) .* 100 * k0, ks)
+    ks = vcat(-ks, ks)
+    kz⊥s = [abs(k) .* (sign(k) * cospi(θ / π), sinpi(θ / π)) for k in ks]
 
     # change order for better distributed scheduling
-    ks = shuffle(vcat([ks[i:nprocs():end] for i ∈ 1:nprocs()]...))
-    @assert length(ks) == nk
+#    ks = shuffle(vcat([ks[i:nprocs():end] for i ∈ 1:nprocs()]...))
+#    @assert length(ks) == nk
     solutions = @sync @showprogress @distributed (vcat) for ωr ∈ ωrs
       cache = Cache()
       objective! = @closure (C, x) -> f2Dω!(C, x, plasma, cache)
       innersolutions = Vector()
-      for (ik, k) ∈ enumerate(ks)
-        K = Wavenumber(wavenumber=k, propagationangle=89.5 * π / 180)
+      for (ik, kz⊥) ∈ enumerate(kz⊥s)
+        @assert kz⊥[2] >= 0
+        #K = Wavenumber(wavenumber=k, propagationangle=θ)
+        K = Wavenumber(parallel=kz⊥[1], perpendicular=kz⊥[2])
         output = solve_given_kω(K, ωr, objective!)
         isempty(output) && continue
         push!(innersolutions, output...)
@@ -192,11 +197,11 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
   ωs = [sol.frequency for sol in sols]./w0
   kzs = [para(sol.wavenumber) for sol in sols]./k0
   k⊥s = [perp(sol.wavenumber) for sol in sols]./k0
-  ks = [abs(sol.wavenumber) for sol in sols]./k0
+  ks = [abs(sol.wavenumber) for sol in sols]./k0 .* sign.(kzs)
 
   kθs = atan.(k⊥s, kzs)
 
-  msize = 2
+  msize = 1
   mshape = :square
   xlabel = "\$\\mathrm{Perpendicular\\ Wavenumber} \\ [\\Omega_{i} / V_A]\$"
   ylabel = "\$\\mathrm{Parallel\\ Wavenumber} \\ [\\Omega_{i} / V_A]\$"
@@ -205,9 +210,9 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
   xlabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
   ylabel = "\$\\mathrm{Parallel\\ Wavenumber} \\ [\\Omega_{i} / V_A]\$"
 
-  imaglolim = -1e-2
-  wplotmax = ceil(Int, maximum(real, ωs))
-  kplotmax = ceil(Int, maximum(real, ks))
+  imaglolim = -1e-4
+  wplotmax = ceil(Int, maximum(real, ωs) / 10) * 10
+  kplotmax = ceil(Int, maximum(real, ks) / 50) * 50
 
   mask = shuffle(findall(@. (imag(ωs) > imaglolim) & (real(ωs) <= wplotmax)))
   @warn "Scatter plots rendering with $(length(mask)) points."
@@ -223,23 +228,24 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
   xlabel = "\$\\mathrm{Wavenumber} \\ [\\Omega_{i}/V_A]\$"
   ylabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
   h0 = Plots.scatter(ks[mask][perm], real.(ωs[mask][perm]),
-    zcolor=imag.(ωs[mask][perm]), framestyle=:box, lims=:round,
+    zcolor=(imag.(ωs[mask][perm])), framestyle=:box, lims=:round,
     markersize=msize+1, markerstrokewidth=0, markershape=:circle,
-    c=colorgrad, xticks=0:50:kplotmax, yticks=0:5:wplotmax,
+    c=colorgrad, xticks=-kplotmax:200:kplotmax, yticks=0:5:wplotmax,
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
   Plots.plot!(legend=false)
   Plots.savefig("ICE2D_FKwplotmax_$file_extension.pdf")
 
-  xlabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
+  #xlabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
+  xlabel = "\$\\mathrm{Wavenumber} \\ [\\Omega_{i}/V_A]\$"
   ylabel = "\$\\mathrm{Growth\\ Rate} \\ [\\Omega_{i}]\$"
   mask = shuffle(findall(@. (imag(ωs) > imaglolim) & (real(ωs) <= wplotmax)))
-  h1 = Plots.scatter(real.(ωs[mask]), imag.(ωs[mask]),
+  h1 = Plots.scatter(real.(ks[mask]), imag.(ωs[mask]),
     zcolor=kzs[mask], framestyle=:box, lims=:round,
     markersize=msize+1, markerstrokewidth=0, markershape=:circle,
     c=colorgrad, xticks=(0:5:wplotmax),
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
   Plots.plot!(legend=false)
-  Plots.savefig("ICE2D_Fwplotmax_$file_extension.pdf")
+  Plots.savefig("ICE2D_Kwplotmax_$file_extension.pdf")
 
   colorgrad1 = Plots.cgrad([:cyan, :red, :blue, :orange, :green,
                             :black, :yellow])
@@ -289,7 +295,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
   Plots.savefig("ICE2D_Combo_$file_extension.pdf")
 end
 
-if true
+if false
   @time plasmasols = findsolutions(Smmh)
   @show length(plasmasols)
   @time plotit(plasmasols)
@@ -297,8 +303,8 @@ if true
   rmprocs(nprocsadded)
 else
   rmprocs(nprocsadded)
-  @load "solutions2D_$name_extension.jld" filecontents solutions w0 k0
-  @time plotit(solutions)
+  @load "solutions2D_$name_extension.jld" filecontents plasmasols w0 k0
+  @time plotit(plasmasols)
 end
 
 println("Ending at ", now())
