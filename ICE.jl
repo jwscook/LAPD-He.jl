@@ -94,7 +94,7 @@ addprocs(nprocsadded, exeflags="--project")
   end
 
   options = Options(memoiseparallel=false, memoiseperpendicular=true,
-   rtols=1e-14)
+                    rtols=10eps(), atols=0.0)
 
   function solve_given_kω(K, ωr, objective!)
     lb, ub = bounds(ωr)
@@ -109,8 +109,8 @@ addprocs(nprocsadded, exeflags="--project")
     config = Configuration(K, options)
 
     ics = ((@SArray [ωr, gammamax*0.9]),
-           (@SArray [ωr, gammamax*0.25]),
-           (@SArray [ωr, gammamax*0.1]),
+           (@SArray [ωr, gammamax*0.6]),
+           (@SArray [ωr, gammamax*0.3]),
            (@SArray [ωr, -gammamax*0.1]))
 
     function unitobjective!(c, x::T) where {T}
@@ -161,11 +161,11 @@ addprocs(nprocsadded, exeflags="--project")
   end
 
   function findsolutions(plasma)
-    nk = 128 * 4
+    nk = 128 * 8
     nw = 64 * 2
     θ = 89.5 * π / 180
     ωrs = range(0.0, stop=60, length=nw) * w0
-    ks = collect((1/2nk:1/nk:1-1/2nk) .* 2000 .+ 100) .* k0
+    ks = collect((1/2nk:1/nk:1-1/2nk) .* 2500 .+ 100) .* k0
     ks = vcat(collect(1/2nk:1/nk:1-1/2nk) .* 100 * k0, ks)
     ks = vcat(-ks, ks)
     kz⊥s = [abs(k) .* (sign(k) * cospi(θ / π), sinpi(θ / π)) for k in ks]
@@ -220,21 +220,21 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
   perm = sortperm(imag.(ωs[mask]))
   h0 = Plots.scatter(real.(ωs[mask][perm]), kzs[mask][perm],
     zcolor=imag.(ωs[mask][perm]), framestyle=:box, lims=:round,
-    markersize=msize+1, markerstrokewidth=0, markershape=:circle,
+    markersize=msize, markerstrokewidth=0, markershape=:circle,
     c=colorgrad, xticks=(0:5:wplotmax), yticks=0:50:kplotmax,
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
   Plots.plot!(legend=false)
-  Plots.savefig("ICE2D_KFwplotmax_$file_extension.pdf")
+  Plots.savefig("ICE1D_KFwplotmax_$file_extension.pdf")
 
   xlabel = "\$\\mathrm{Wavenumber} \\ [\\Omega_{i}/V_A]\$"
   ylabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
   h0 = Plots.scatter(ks[mask][perm], real.(ωs[mask][perm]),
     zcolor=imag.(ωs[mask][perm]) .* 1e3, framestyle=:box, lims=:round,
-    markersize=msize+1, markerstrokewidth=0, markershape=:circle,
+    markersize=msize, markerstrokewidth=0, markershape=:circle,
     c=colorgrad, xticks=-kplotmax:500:kplotmax, yticks=0:5:wplotmax,
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
   Plots.plot!(legend=false)
-  Plots.savefig("ICE2D_FKwplotmax_$file_extension.pdf")
+  Plots.savefig("ICE1D_FKwplotmax_$file_extension.pdf")
 
   #xlabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
   xlabel = "\$\\mathrm{Wavenumber} \\ [\\Omega_{i}/V_A]\$"
@@ -242,22 +242,23 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
   mask = shuffle(findall(@. (imag(ωs) > imaglolim) & (real(ωs) <= wplotmax)))
   h1 = Plots.scatter(real.(ks[mask]), imag.(ωs[mask]),
     zcolor=kzs[mask], framestyle=:box, lims=:round,
-    markersize=msize+1, markerstrokewidth=0, markershape=:circle,
+    markersize=msize, markerstrokewidth=0, markershape=:circle,
     c=colorgrad, xticks=(0:5:wplotmax),
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
   Plots.plot!(legend=false)
-  Plots.savefig("ICE2D_Kwplotmax_$file_extension.pdf")
+  Plots.savefig("ICE1D_Kwplotmax_$file_extension.pdf")
 
   colorgrad1 = Plots.cgrad([:cyan, :red, :blue, :orange, :green,
                             :black, :yellow])
-  mask = shuffle(findall(@. (imag(ωs) > imaglolim) & (real(ωs) <= wplotmax)))
-  h2 = Plots.scatter(real.(ωs[mask]), imag.(ωs[mask]),
+  ylabel = "\$\\mathrm{Log10\\ Growth\\ Rate} \\ [\\Omega_{i}]\$"
+  mask = shuffle(findall(@. (imag(ωs) > 0) & (real(ωs) <= wplotmax)))
+  h2 = Plots.scatter(real.(ωs[mask]), log10.(imag.(ωs[mask])),
     zcolor=(real.(ωs[mask]) .- vfz/Va .* kzs[mask]), framestyle=:box, lims=:round,
-    markersize=msize+1, markerstrokewidth=0, markershape=:circle,
-    c=colorgrad1, clims=(0, 13), xticks=(0:5:wplotmax),
+    markersize=msize, markerstrokewidth=0, markershape=:circle,
+    c=colorgrad1, clims=(0, wplotmax), xticks=(0:5:wplotmax),
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
   Plots.plot!(legend=false)
-  Plots.savefig("ICE2D_Fwplotmax_Doppler_$file_extension.pdf")
+  Plots.savefig("ICE1D_Fwplotmax_Doppler_$file_extension.pdf")
 
   xlabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
   ylabel = "\$\\mathrm{Propagation\\ Angle} \\ [^{\\circ}]\$"
@@ -271,7 +272,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
     clims=(0, maximum(imag.(ωs[mask]))),
     yticks=(0:10:180), xticks=(0:wplotmax), xlabel=xlabel, ylabel=ylabel)
   Plots.plot!(legend=false)
-  Plots.savefig("ICE2D_TFwplotmax_$file_extension.pdf")
+  Plots.savefig("ICE1D_TFwplotmax_$file_extension.pdf")
 
   function relative(p, rx, ry)
     xlims = Plots.xlims(p)
@@ -280,20 +281,10 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
    end
   Plots.xlabel!(h1, "")
   Plots.xticks!(h1, 0:-1)
-  if pitchanglecosine == -0.646
-    xy_data = readdlm("data.csv", ',', Float64)
-    x_data = xy_data[:, 1]
-    y_data = xy_data[:, 2]
-    y_data .-= minimum(y_data)
-    y_data ./= (maximum(y_data) - minimum(y_data))
-    y_data .*= maximum(imag.(ωs[mask]))
-    x_data .*= 1e6 / (w0/2π)
-    Plots.plot!(h1, x_data, y_data, color=:black)
-  end
   Plots.annotate!(h1, [(relative(h1, 0.02, 0.95)..., text("(a)", fontsize, :black))])
   Plots.annotate!(h0, [(relative(h0, 0.02, 0.95)..., text("(b)", fontsize, :black))])
   Plots.plot(h1, h0, link=:x, layout=@layout [a; b])
-  Plots.savefig("ICE2D_Combo_$file_extension.pdf")
+  Plots.savefig("ICE1D_Combo_$file_extension.pdf")
 end
 
 if true
