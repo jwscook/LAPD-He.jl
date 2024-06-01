@@ -1,6 +1,7 @@
 using Distributed, Dates
 using Plots, Random, ImageFiltering, Statistics
 using Dierckx, Contour, JLD2, DelimitedFiles
+using Measures
 
 println("Starting at ", now())
 # pitchanglecosine of 0 is all vperp, and (-)1 is (anti-)parallel to B field
@@ -223,7 +224,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
     markersize=msize, markerstrokewidth=0, markershape=:circle,
     c=colorgrad, xticks=(0:5:wplotmax), yticks=0:50:kplotmax,
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
-  Plots.plot!(legend=false)
+  Plots.plot!(legend=false, margin=2mm)
   Plots.savefig("ICE1D_KFwplotmax_$file_extension.pdf")
 
   xlabel = "\$\\mathrm{Wavenumber} \\ [\\Omega_{i}/V_A]\$"
@@ -233,7 +234,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
     markersize=msize, markerstrokewidth=0, markershape=:circle,
     c=colorgrad, xticks=-kplotmax:500:kplotmax, yticks=0:5:wplotmax,
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
-  Plots.plot!(legend=false)
+  Plots.plot!(legend=false, margin=2mm)
   Plots.savefig("ICE1D_FKwplotmax_$file_extension.pdf")
 
   #xlabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
@@ -245,7 +246,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
     markersize=msize, markerstrokewidth=0, markershape=:circle,
     c=colorgrad, xticks=(0:5:wplotmax),
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
-  Plots.plot!(legend=false)
+  Plots.plot!(legend=false, margin=2mm)
   Plots.savefig("ICE1D_Kwplotmax_$file_extension.pdf")
 
   colorgrad1 = Plots.cgrad([:cyan, :red, :blue, :orange, :green,
@@ -257,7 +258,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
     markersize=msize, markerstrokewidth=0, markershape=:circle,
     c=colorgrad1, clims=(0, wplotmax), xticks=(0:5:wplotmax),
     xlabel=xlabel, ylabel=ylabel, legend=:topleft)
-  Plots.plot!(legend=false)
+  Plots.plot!(legend=false, margin=2mm)
   Plots.savefig("ICE1D_Fwplotmax_Doppler_$file_extension.pdf")
 
   xlabel = "\$\\mathrm{Frequency} \\ [\\Omega_{i}]\$"
@@ -271,7 +272,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
     c=Plots.cgrad([:black, :darkred, :red, :orange, :yellow]),
     clims=(0, maximum(imag.(ωs[mask]))),
     yticks=(0:10:180), xticks=(0:wplotmax), xlabel=xlabel, ylabel=ylabel)
-  Plots.plot!(legend=false)
+  Plots.plot!(legend=false, margin=2mm)
   Plots.savefig("ICE1D_TFwplotmax_$file_extension.pdf")
 
   function relative(p, rx, ry)
@@ -284,6 +285,7 @@ function plotit(sols, file_extension=name_extension, fontsize=9)
   Plots.annotate!(h1, [(relative(h1, 0.02, 0.95)..., text("(a)", fontsize, :black))])
   Plots.annotate!(h0, [(relative(h0, 0.02, 0.95)..., text("(b)", fontsize, :black))])
   Plots.plot(h1, h0, link=:x, layout=@layout [a; b])
+  Plots.plot!(margin=2mm)
   Plots.savefig("ICE1D_Combo_$file_extension.pdf")
 end
 
